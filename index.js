@@ -1,6 +1,6 @@
 const express = require('express')
 const cors = require('cors')
-const { MongoClient, ServerApiVersion } = require('mongodb')
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb')
 require('dotenv').config()
 
 const port = process.env.PORT || 9000
@@ -48,7 +48,60 @@ async function run() {
 
     app.get('/all-jobs', async (req, res) => {
       const result = await jobCollection.find().toArray();
+      res.send(result);
+    })
+
+    // get jobs using user email
+
+    app.get('/all-jobs/:email', async (req, res) => {
+
+      const email = req.params.email;
+      const quiery = { 'byear.email': email };
+      const result = await jobCollection.find(quiery).toArray();
+      res.send(result);
+    })
+
+
+    //dalete a jov using job dainamic id
+
+    app.delete('/job/:id', async (req, res) => {
+      const id = req.params.id;
+      const quiery = { _id: new ObjectId(id) };
+      const result = await jobCollection.deleteOne(quiery);
+      res.send(result);
+    })
+
+
+    // get one job data using id for update and application section
+
+    //finde update job
+
+    app.get('/job/:id', async (req, res) => {
+      const id = req.params.id;
+      const quiery = { _id: new ObjectId(id) };
+      const result = await jobCollection.findOne(quiery);
       res.send(result)
+    })
+
+    //update job
+
+    app.put('/update/:id', async (req, res) => {
+      const id = req.params.id;
+
+      const jobData = req.body;
+
+
+      const quiery = { _id: new ObjectId(id) };
+
+      const option = { upsert: true };
+      const update = {
+        $set: jobData,
+      };
+
+      const result = await jobCollection.updateOne(quiery, update, option);
+      res.send(result);
+
+
     })
 
 
