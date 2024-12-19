@@ -26,7 +26,8 @@ async function run() {
 
 
     const db = client.db('solo-Jobs');
-    const jobCollection = db.collection('jobs')
+    const jobCollection = db.collection('jobs');
+    const bidsCollection = db.collection('bids');
 
 
 
@@ -71,6 +72,77 @@ async function run() {
       res.send(result);
     })
 
+
+    //post bids data in client side
+
+    app.post('/add-bid', async (req, res) => {
+      const bidData = req.body;
+
+
+      //if a user placed abids alrady in this job
+
+      const query = { email: bidData.email, jobId: bidData.jobId };
+
+      const alreadyexist = await bidsCollection.findOne(query)
+      if (alreadyexist) {
+        return res.status(400).send("You have already bid this job.")
+      }
+
+
+      //save data in data bse
+      const result = await bidsCollection.insertOne(bidData);
+
+
+
+      // increase bids count in jobs collaction
+
+      const filtter = { _id: new ObjectId(bidData.jobId) }
+
+      const update = {
+        $inc: { bit_count: 1 },
+      }
+      const updateBidsCount = await jobCollection.updateOne(filtter, update);
+
+      console.log(updateBidsCount);
+
+      res.send(result)
+    })
+
+
+
+
+    // get spaciphic bids data using user email
+
+    app.get('/bids/:email', async (req, res) => {
+      const email = req.params.email;
+      const query = { email }
+      const result = await bidsCollection.find(query).toArray();
+      res.send(result)
+    })
+
+    // get spaciphic  bids requast data using user email
+
+    app.get('/bids-requst/:email', async (req, res) => {
+      const email = req.params.email;
+      const query = { byear: email }
+      const result = await bidsCollection.find(query).toArray();
+      res.send(result)
+    })
+
+
+    //update bid status
+
+    app.patch('/bid-status-update/:id', async (req, res) => {
+      const status = req.body;
+      const id = req.params.id;
+      const filtter = { _id: new ObjectId(id) }
+      const update = {
+        $set: { status },
+      }
+      const result = await bidsCollection.updateOne(filtter, update);
+      res.send(result);
+
+    })
 
     // get one job data using id for update and application section
 
