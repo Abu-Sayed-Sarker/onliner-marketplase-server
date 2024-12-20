@@ -1,13 +1,23 @@
 const express = require('express')
 const cors = require('cors')
+const cookieParser = require('cookie-parser')
+const jwt = require("jsonwebtoken")
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb')
 require('dotenv').config()
 
 const port = process.env.PORT || 9000
 const app = express()
 
-app.use(cors())
+
+const corsOption = {
+  origin: ["http://localhost:5173"],
+  credentials: true,
+  optionalSuccessStatus: 200,
+}
+
+app.use(cors(corsOption))
 app.use(express.json())
+app.use(cookieParser())
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.54bcg.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
@@ -21,6 +31,24 @@ const client = new MongoClient(uri, {
   },
 })
 
+// verify jhwt  token midelwear
+
+const verifyToken = (req, res, next) => {
+
+  const token = req.cookies?.token
+  if (!token) return res.status(401).send({ message: 'unauthorized access' })
+  jwt.verify(token, process.env.SECRET_KEY, (err, decode) => {
+    if (err) {
+      return res.status(403).send({ message: 'unauthorized access' })
+    }
+    req.user = decode
+  })
+
+
+
+
+  next()
+}
 async function run() {
   try {
 
@@ -28,6 +56,36 @@ async function run() {
     const db = client.db('solo-Jobs');
     const jobCollection = db.collection('jobs');
     const bidsCollection = db.collection('bids');
+
+
+
+    // jsonweb tokwn genarate
+
+    app.post('/jwt', async (req, res) => {
+      const email = req.body;
+
+      //create token
+      const token = jwt.sign(email, process.env.SECRET_KEY, { expiresIn: '1d' })
+
+      res.cookie('token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+      })
+        .send({ success: true })
+
+    })
+    // log out and delete cookie
+
+    app.get('/logout', async (req, res) => {
+      res.clearCookie('token', {
+        maxAge: 0,
+        credentials: true,
+        optionalSuccessStatus: 200,
+      })
+        .send({ success: true })
+    })
+
 
 
 
@@ -45,10 +103,23 @@ async function run() {
     })
 
 
-    // get all jobs in data base 
+    // get all jobs in data base and filter, sorting, and serching function
 
     app.get('/all-jobs', async (req, res) => {
-      const result = await jobCollection.find().toArray();
+      const filter = req.query.filter;
+      // const search = req.query.search;
+      const sort = req.query.sort;
+
+      // sort vai date 
+      let options = {}
+      if (sort) options = { sort: { date: sort === 'asc' ? 1 : -1 } }
+
+
+      let query = {
+        // job_title: { $regex: search, $options: 'i' }
+      };
+      if (filter) query.category = filter;
+      const result = await jobCollection.find(query, options).toArray();
       res.send(result);
     })
 
@@ -114,7 +185,9 @@ async function run() {
     // get spaciphic bids data using user email
 
     app.get('/bids/:email', async (req, res) => {
+
       const email = req.params.email;
+
       const query = { email }
       const result = await bidsCollection.find(query).toArray();
       res.send(result)
@@ -122,8 +195,12 @@ async function run() {
 
     // get spaciphic  bids requast data using user email
 
-    app.get('/bids-requst/:email', async (req, res) => {
+    app.get('/bids-requst/:email', verifyToken, async (req, res) => {
+      const decodedEmail = req.user?.email
       const email = req.params.email;
+      if (decodedEmail !== email) {
+        return res.status(401).send({ message: 'unauthorized access' })
+      }
       const query = { byear: email }
       const result = await bidsCollection.find(query).toArray();
       res.send(result)
