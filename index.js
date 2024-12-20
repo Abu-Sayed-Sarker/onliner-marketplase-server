@@ -133,7 +133,7 @@ async function run() {
     //update bid status
 
     app.patch('/bid-status-update/:id', async (req, res) => {
-      const status = req.body;
+      const { status } = req.body;
       const id = req.params.id;
       const filtter = { _id: new ObjectId(id) }
       const update = {
